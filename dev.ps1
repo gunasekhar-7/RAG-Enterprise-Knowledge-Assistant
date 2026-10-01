@@ -69,7 +69,7 @@ switch ($Command) {
         # 3. Node.js Frontend Dependencies
         Write-Host "Installing frontend dependencies (npm install)..."
         Push-Location "$RootDir\frontend"
-        npm install
+        & npm.cmd install
         Pop-Location
         Write-Success "Frontend dependencies installed."
 
@@ -105,7 +105,7 @@ switch ($Command) {
     "run-frontend" {
         Write-Header "Starting React Frontend on http://localhost:5173..."
         Push-Location "$RootDir\frontend"
-        npm run dev
+        & npm.cmd run dev
         Pop-Location
     }
 

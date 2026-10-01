@@ -1,6 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
-from typing import List
+
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -21,9 +21,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = Field(default="INFO")
     APP_NAME: str = Field(default="RAG Enterprise Knowledge Assistant")
     API_V1_STR: str = Field(default="/api/v1")
-    CORS_ORIGINS: List[str] = Field(
-        default=["http://localhost:5173", "http://127.0.0.1:5173"]
-    )
+    CORS_ORIGINS: list[str] = Field(default=["http://localhost:5173", "http://127.0.0.1:5173"])
 
     # --- Security & Auth ---
     JWT_SECRET: SecretStr = Field(default=SecretStr("insecure-dev-secret-key-change-me"))
