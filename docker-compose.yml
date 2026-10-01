@@ -1,0 +1,99 @@
+services:
+  # ============================================================================
+  # PostgreSQL 16 with pgvector extension enabled
+  # ============================================================================
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: rag_postgres
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-rag_knowledge_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/docker/init-pgvector.sql:/docker-entrypoint-initdb.d/init-pgvector.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-rag_knowledge_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rag_network
+
+  # ============================================================================
+  # Redis 7 (Celery Broker, Sessions, & Rate-limiting)
+  # ============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: rag_redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - rag_network
+
+  # ============================================================================
+  # MinIO (S3-compatible Object Storage for Document Files)
+  # ============================================================================
+  minio:
+    image: minio/minio:latest
+    container_name: rag_minio
+    restart: unless-stopped
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rag_network
+
+  # ============================================================================
+  # MinIO Bucket Auto-initializer
+  # ============================================================================
+  minio-init:
+    image: minio/mc:latest
+    container_name: rag_minio_init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin};
+      /usr/bin/mc mb --ignore-existing myminio/${S3_BUCKET_NAME:-rag-documents};
+      /usr/bin/mc anonymous set download myminio/${S3_BUCKET_NAME:-rag-documents};
+      exit 0;
+      "
+    networks:
+      - rag_network
+
+networks:
+  rag_network:
+    name: rag_network
+    driver: bridge
+
+volumes:
+  postgres_data:
+    name: rag_postgres_data
+  redis_data:
+    name: rag_redis_data
+  minio_data:
+    name: rag_minio_data
