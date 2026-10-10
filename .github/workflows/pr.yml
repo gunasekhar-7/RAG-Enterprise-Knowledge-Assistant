@@ -1,0 +1,128 @@
+name: PR Verification
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  code-quality:
+    name: Code Quality & Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Install Dependencies
+        run: |
+          cd backend
+          uv pip install --system -e ".[dev]"
+
+      - name: Code Formatting (Ruff)
+        run: |
+          cd backend
+          ruff format --check .
+
+      - name: Linting (Ruff)
+        run: |
+          cd backend
+          ruff check .
+
+      - name: Type Checking (MyPy)
+        run: |
+          cd backend
+          mypy --config-file pyproject.toml app/
+
+      - name: Security Code Scan (Bandit)
+        run: |
+          cd backend
+          bandit -r app/ -ll -ii
+
+  testing:
+    name: Unit & Integration Tests
+    needs: code-quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Install Dependencies
+        run: |
+          cd backend
+          uv pip install --system -e ".[dev]"
+
+      - name: Run Tests
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          cd backend
+          pytest tests/ --maxfail=1 -v
+
+  docker-scan:
+    name: Docker Build & Vulnerability Scan
+    needs: testing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Backend Image
+        run: docker build -t rag-backend:test ./backend
+        
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'rag-backend:test'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+  frontend-checks:
+    name: Frontend Lint & Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Install Dependencies
+        run: |
+          cd frontend
+          npm ci
+          
+      - name: Lint (ESLint)
+        run: |
+          cd frontend
+          npm run lint
+          
+      - name: Type Check (TypeScript)
+        run: |
+          cd frontend
+          npx tsc --noEmit
+          
+      - name: Production Build
+        run: |
+          cd frontend
+          npm run build
+

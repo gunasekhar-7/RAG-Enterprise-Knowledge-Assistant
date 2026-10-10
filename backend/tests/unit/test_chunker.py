@@ -61,11 +61,11 @@ def test_page_number_preservation_across_multiple_pages() -> None:
     chunker = DocumentChunker()
     chunks = chunker.chunk_document(doc)
 
-    assert len(chunks) == 2
+    assert len(chunks) == 1
     assert chunks[0].metadata.page_number == 1
+    assert chunks[0].metadata.page_end == 2
     assert "Page 1: Overview" in chunks[0].text
-    assert chunks[1].metadata.page_number == 2
-    assert "Page 2: Travel" in chunks[1].text
+    assert "Page 2: Travel" in chunks[0].text
 
 
 def test_long_page_recursive_splitting() -> None:

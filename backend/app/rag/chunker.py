@@ -1,5 +1,6 @@
 """Production-quality document chunking engine with token bounds, page preservation, and section tracking."""
 
+import contextlib
 import re
 
 import tiktoken
@@ -177,55 +178,105 @@ class DocumentChunker:
             overlap=self.config.chunk_overlap,
         )
 
+        global_text = ""
+        char_to_page = []  # type: ignore
+
         for page in document.pages:
             page_text = page.text.strip()
-
-            # Skip empty or negligible pages
-            if len(page_text) < self.config.min_chunk_size_chars:
+            if not page_text:
                 continue
 
-            # Update active section header if present on this page
-            if self.config.extract_section_headers:
-                found_header = self.extract_header(page_text)
-                if found_header:
-                    active_section_header = found_header
+            if global_text:
+                sep = "\n\n"
+                global_text += sep
+                char_to_page.extend([char_to_page[-1]] * len(sep))
 
-            # Recursively split page text
-            page_raw_chunks = self._split_text_recursive(page_text)
+            global_text += page_text
+            char_to_page.extend([page.page_number] * len(page_text))
 
-            # Apply overlap across chunks on this page
-            page_chunks_with_overlap = self._apply_overlap(page_raw_chunks)
+        if not global_text:
+            return chunks
 
-            # Build DocumentChunk objects
-            for chunk_text in page_chunks_with_overlap:
-                clean_chunk_text = chunk_text.strip()
-                if len(clean_chunk_text) < self.config.min_chunk_size_chars:
-                    continue
+        raw_chunks = self._split_text_recursive(global_text)
 
-                chunk_token_count = self.tokenizer.count_tokens(clean_chunk_text)
-                chunk_id = f"{document.id}_c{global_chunk_idx:04d}"
+        raw_positions = []
+        search_idx = 0
+        for rc in raw_chunks:
+            idx = global_text.find(rc, search_idx)
+            if idx == -1:
+                idx = search_idx
+            raw_positions.append((idx, idx + len(rc)))
+            search_idx = idx + len(rc)
 
-                chunk_meta = ChunkMetadata(
+        overlapped_chunks = self._apply_overlap(raw_chunks)
+
+        import uuid
+
+        tenant_id = document.id
+        tenant_id_str = document.metadata.custom_metadata.get("tenant_id")
+        if not tenant_id_str and document.storage_key:
+            parts = document.storage_key.split("/")
+            if len(parts) >= 2:
+                tenant_id_str = parts[0]
+
+        if tenant_id_str:
+            with contextlib.suppress(ValueError):
+                tenant_id = uuid.UUID(str(tenant_id_str))
+
+        for i, chunk_text in enumerate(overlapped_chunks):
+            clean_chunk_text = chunk_text.strip()
+            if len(clean_chunk_text) < self.config.min_chunk_size_chars:
+                continue
+
+            start_char_idx = raw_positions[i][0]
+            if i > 0 and self.config.chunk_overlap > 0:
+                prefix = clean_chunk_text[:20]
+                idx = global_text.find(prefix, raw_positions[i - 1][0])
+                if idx != -1 and idx <= raw_positions[i][0]:
+                    start_char_idx = idx
+                else:
+                    start_char_idx = raw_positions[i - 1][0]
+
+            end_char_idx = raw_positions[i][1] - 1
+            if end_char_idx < 0:
+                end_char_idx = 0
+
+            page_start = char_to_page[start_char_idx] if start_char_idx < len(char_to_page) else 1
+            page_end = (
+                char_to_page[min(end_char_idx, len(char_to_page) - 1)]
+                if end_char_idx >= 0
+                else page_start
+            )
+
+            header = self.extract_header(clean_chunk_text)
+            if header:
+                active_section_header = header
+
+            chunk_token_count = self.tokenizer.count_tokens(clean_chunk_text)
+            chunk_id = f"{document.id}_c{global_chunk_idx:04d}"
+
+            chunk_meta = ChunkMetadata(  # type: ignore
+                document_id=document.id,
+                tenant_id=tenant_id,
+                chunk_index=global_chunk_idx,
+                page_number=page_start,
+                page_end=page_end,
+                section_heading=active_section_header,
+                filename=document.metadata.filename,
+                token_count=chunk_token_count,
+                char_count=len(clean_chunk_text),
+                custom_metadata=document.metadata.custom_metadata,
+            )
+
+            chunks.append(
+                DocumentChunk(  # type: ignore
+                    chunk_id=chunk_id,
                     document_id=document.id,
-                    chunk_index=global_chunk_idx,
-                    page_number=page.page_number,
-                    page_end=page.page_number,
-                    section_heading=active_section_header,
-                    filename=document.metadata.filename,
-                    token_count=chunk_token_count,
-                    char_count=len(clean_chunk_text),
-                    custom_metadata=document.metadata.custom_metadata,
+                    text=clean_chunk_text,
+                    metadata=chunk_meta,
                 )
-
-                chunks.append(
-                    DocumentChunk(
-                        chunk_id=chunk_id,
-                        document_id=document.id,
-                        text=clean_chunk_text,
-                        metadata=chunk_meta,
-                    )
-                )
-                global_chunk_idx += 1
+            )
+            global_chunk_idx += 1
 
         logger.info(
             "chunking_completed",

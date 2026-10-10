@@ -1,0 +1,7 @@
+{
+    "env": {
+        "ANTHROPIC_BASE_URL": "http://localhost:20128/v1",
+        "ANTHROPIC_AUTH_TOKEN": "sk-e225b7ed2588647b-829c75-78ef5a09",
+        "ANTHROPIC_MODEL": "Claude_VS"
+    }
+}

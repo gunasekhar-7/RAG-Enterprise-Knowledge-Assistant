@@ -1,0 +1,242 @@
+[
+  {
+    "id": "eval_001",
+    "question": "What is the policy for carrying over unused vacation days?",
+    "expected_answer": "Employees may carry forward a maximum of 5 unused vacation days into the following year, expiring March 31st.",
+    "expected_source": "HR_Policy_2026.md",
+    "relevant_chunk_ids": [
+      "doc_hr_policy_2026_c0000"
+    ],
+    "negative_query": false
+  },
+  {
+    "id": "eval_002",
+    "question": "Who is eligible for the 401k match?",
+    "expected_answer": "All full-time employees are eligible for the 401k match after 90 days of employment.",
+    "expected_source": "HR_Policy_2026.md",
+    "relevant_chunk_ids": [
+      "doc_hr_policy_2026_c0000"
+    ],
+    "negative_query": false
+  },
+  {
+    "id": "eval_003",
+    "question": "What is the maternity leave policy?",
+    "expected_answer": "Employees are entitled to 12 weeks of paid maternity leave after one year of continuous service.",
+    "expected_source": "HR_Policy_2026.md",
+    "relevant_chunk_ids": [
+      "doc_hr_policy_2026_c0000"
+    ],
+    "negative_query": false
+  },
+  {
+    "id": "eval_004",
+    "question": "Are mental health days separate from sick leave?",
+    "expected_answer": "Yes, employees are granted 2 dedicated mental health days per year separate from standard sick leave.",
+    "expected_source": "HR_Policy_2026.md",
+    "relevant_chunk_ids": [
+      "doc_hr_policy_2026_c0000"
+    ],
+    "negative_query": false
+  },
+  {
+    "id": "eval_005",
+    "question": "How many times can I work from home per week?",
+    "expected_answer": "The company supports a hybrid model allowing employees to work from home up to 3 days per week.",
+    "expected_source": "HR_Policy_2026.md",
+    "relevant_chunk_ids": [
+      "doc_hr_policy_2026_c0000"
+    ],
+    "negative_query": false
+  },
+  {
+    "id": "eval_006",
+    "question": "How often must passwords be rotated?",
+    "expected_answer": "Passwords must be rotated every 90 days and must not reuse the last 5 passwords.",
+    "expected_source": "IT_Security_SOP.md",
+    "relevant_chunk_ids": [
+      "doc_it_security_sop_c0000"
+    ],
+    "negative_query": false
+  },
+  {
+    "id": "eval_007",
+    "question": "What happens if I lose my YubiKey?",
+    "expected_answer": "Report a lost YubiKey immediately to the IT Helpdesk via phone to revoke access.",
+    "expected_source": "IT_Security_SOP.md",
+    "relevant_chunk_ids": [
+      "doc_it_security_sop_c0000"
+    ],
+    "negative_query": false
+  },
+  {
+    "id": "eval_008",
+    "question": "Can I install third-party browser extensions?",
+    "expected_answer": "Only explicitly whitelisted browser extensions may be installed. Requests must go through IT Security.",
+    "expected_source": "IT_Security_SOP.md",
+    "relevant_chunk_ids": [
+      "doc_it_security_sop_c0000"
+    ],
+    "negative_query": false
+  },
+  {
+    "id": "eval_009",
+    "question": "Is it allowed to use personal USB drives?",
+    "expected_answer": "No, the use of personal USB drives or external storage is strictly prohibited on company endpoints.",
+    "expected_source": "IT_Security_SOP.md",
+    "relevant_chunk_ids": [
+      "doc_it_security_sop_c0000"
+    ],
+    "negative_query": false
+  },
+  {
+    "id": "eval_010",
+    "question": "What is the VPN auto-disconnect timeout?",
+    "expected_answer": "The corporate VPN will automatically disconnect after 12 hours of continuous connection.",
+    "expected_source": "IT_Security_SOP.md",
+    "relevant_chunk_ids": [
+      "doc_it_security_sop_c0000"
+    ],
+    "negative_query": false
+  },
+  {
+    "id": "eval_011",
+    "question": "What is the daily per diem for meals in London?",
+    "expected_answer": "The daily per diem for meals and incidental expenses in London is $125 USD.",
+    "expected_source": "Travel_Policy.md",
+    "relevant_chunk_ids": [
+      "doc_travel_policy_c0000"
+    ],
+    "negative_query": false
+  },
+  {
+    "id": "eval_012",
+    "question": "Can I book first-class flights?",
+    "expected_answer": "First-class flights are only permitted for international travel exceeding 8 hours of continuous flight time.",
+    "expected_source": "Travel_Policy.md",
+    "relevant_chunk_ids": [
+      "doc_travel_policy_c0000"
+    ],
+    "negative_query": false
+  },
+  {
+    "id": "eval_013",
+    "question": "How many days after travel must expenses be submitted?",
+    "expected_answer": "All travel expenses must be submitted via Concur within 14 days of trip completion.",
+    "expected_source": "Travel_Policy.md",
+    "relevant_chunk_ids": [
+      "doc_travel_policy_c0000"
+    ],
+    "negative_query": false
+  },
+  {
+    "id": "eval_014",
+    "question": "Are alcohol purchases reimbursable?",
+    "expected_answer": "Alcohol is only reimbursable during official client dinners, capped at 2 drinks per person.",
+    "expected_source": "Travel_Policy.md",
+    "relevant_chunk_ids": [
+      "doc_travel_policy_c0000"
+    ],
+    "negative_query": false
+  },
+  {
+    "id": "eval_015",
+    "question": "Is TSA PreCheck covered by the company?",
+    "expected_answer": "The company reimburses the cost of TSA PreCheck or Global Entry for frequent travelers (3+ trips/year).",
+    "expected_source": "Travel_Policy.md",
+    "relevant_chunk_ids": [
+      "doc_travel_policy_c0000"
+    ],
+    "negative_query": false
+  },
+  {
+    "id": "eval_016",
+    "question": "What is the primary region for AWS deployments?",
+    "expected_answer": "All primary production workloads must be deployed in the us-east-1 AWS region.",
+    "expected_source": "Infra_SOP.md",
+    "relevant_chunk_ids": [
+      "doc_infra_sop_c0000"
+    ],
+    "negative_query": false
+  },
+  {
+    "id": "eval_017",
+    "question": "How long are database backups retained?",
+    "expected_answer": "Automated database backups are retained for 35 days in S3 Glacier.",
+    "expected_source": "Infra_SOP.md",
+    "relevant_chunk_ids": [
+      "doc_infra_sop_c0000"
+    ],
+    "negative_query": false
+  },
+  {
+    "id": "eval_018",
+    "question": "What is the SLA for P1 incidents?",
+    "expected_answer": "P1 (Critical) incidents have a strict 15-minute response SLA and a 2-hour resolution target.",
+    "expected_source": "Infra_SOP.md",
+    "relevant_chunk_ids": [
+      "doc_infra_sop_c0000"
+    ],
+    "negative_query": false
+  },
+  {
+    "id": "eval_019",
+    "question": "Who approves emergency production deployments?",
+    "expected_answer": "Emergency deployments require explicit approval from the VP of Engineering or the on-call Director.",
+    "expected_source": "Infra_SOP.md",
+    "relevant_chunk_ids": [
+      "doc_infra_sop_c0000"
+    ],
+    "negative_query": false
+  },
+  {
+    "id": "eval_020",
+    "question": "Which tool is used for infrastructure provisioning?",
+    "expected_answer": "Terraform is the exclusive tool for provisioning AWS infrastructure resources.",
+    "expected_source": "Infra_SOP.md",
+    "relevant_chunk_ids": [
+      "doc_infra_sop_c0000"
+    ],
+    "negative_query": false
+  },
+  {
+    "id": "eval_neg_001",
+    "question": "What is the company policy on employee relocation to Mars?",
+    "expected_answer": "Insufficient information",
+    "expected_source": null,
+    "relevant_chunk_ids": [],
+    "negative_query": true
+  },
+  {
+    "id": "eval_neg_002",
+    "question": "How do I expense a private jet for my pet?",
+    "expected_answer": "Insufficient information",
+    "expected_source": null,
+    "relevant_chunk_ids": [],
+    "negative_query": true
+  },
+  {
+    "id": "eval_neg_003",
+    "question": "What is the SLA for alien invasions?",
+    "expected_answer": "Insufficient information",
+    "expected_source": null,
+    "relevant_chunk_ids": [],
+    "negative_query": true
+  },
+  {
+    "id": "eval_neg_004",
+    "question": "Who is the CEO of our main competitor?",
+    "expected_answer": "Insufficient information",
+    "expected_source": null,
+    "relevant_chunk_ids": [],
+    "negative_query": true
+  },
+  {
+    "id": "eval_neg_005",
+    "question": "Can I use company funds to buy cryptocurrencies?",
+    "expected_answer": "Insufficient information",
+    "expected_source": null,
+    "relevant_chunk_ids": [],
+    "negative_query": true
+  }
+]

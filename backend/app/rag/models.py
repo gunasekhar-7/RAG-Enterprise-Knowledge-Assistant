@@ -10,11 +10,10 @@ class ChunkMetadata(BaseModel):
     """Rich metadata preserved with every document chunk for retrieval and citations."""
 
     document_id: UUID = Field(..., description="ID of parent document")
+    tenant_id: UUID = Field(..., description="ID of the tenant owner")
     chunk_index: int = Field(..., ge=0, description="Sequential 0-indexed position within document")
     page_number: int = Field(..., ge=1, description="Primary starting page number for citations")
-    page_end: int | None = Field(
-        None, ge=1, description="Ending page number if chunk spans pages"
-    )
+    page_end: int | None = Field(None, ge=1, description="Ending page number if chunk spans pages")
     section_heading: str | None = Field(None, description="Active section or header context")
     filename: str = Field(..., description="Original source document filename")
     token_count: int = Field(..., ge=0, description="Exact token count of chunk text")
@@ -22,6 +21,7 @@ class ChunkMetadata(BaseModel):
     custom_metadata: dict[str, Any] = Field(
         default_factory=dict, description="Custom tenant or domain metadata"
     )
+    embedding_model: str | None = Field(None, description="Name of the embedding model used")
 
 
 class DocumentChunk(BaseModel):
@@ -33,6 +33,7 @@ class DocumentChunk(BaseModel):
     document_id: UUID = Field(...)
     text: str = Field(..., min_length=1, description="Passage text content")
     metadata: ChunkMetadata
+    embedding: list[float] | None = Field(None, description="The vector representation of the text")
 
     @property
     def citation_source(self) -> str:

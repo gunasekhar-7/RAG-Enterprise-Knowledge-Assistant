@@ -1,0 +1,44 @@
+services:
+  backend:
+    environment:
+      - ENVIRONMENT=production
+      # In production, DO NOT use .env files for secrets. 
+      # Pass them securely via CI/CD orchestrators or Docker Secrets.
+      - LOG_LEVEL=INFO
+    # Remove volume mount for live reloading
+    volumes: []
+    # Use standard uvicorn without --reload, and use worker processes
+    command: ["gunicorn", "app.main:app", "--workers", "4", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"]
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '1'
+          memory: 2G
+
+  frontend:
+    # In production, Nginx runs on standard ports. 
+    # Usually you would put an API Gateway / Load Balancer in front of this handling HTTPS.
+    ports:
+      - "80:80"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+
+  postgres:
+    # Ensure backups are configured in prod
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+
+
+  redis:
+    deploy:
+      resources:
+        limits:
+          memory: 2G

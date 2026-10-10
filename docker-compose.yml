@@ -1,6 +1,6 @@
 services:
   # ============================================================================
-  # PostgreSQL 16 with pgvector extension enabled
+  # PostgreSQL 16 (Relational DB for Auth, Users, metadata)
   # ============================================================================
   postgres:
     image: pgvector/pgvector:pg16
@@ -14,17 +14,16 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-rag_knowledge_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./infra/docker/init-pgvector.sql:/docker-entrypoint-initdb.d/init-pgvector.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-rag_knowledge_db}"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - rag_network
 
   # ============================================================================
-  # Redis 7 (Celery Broker, Sessions, & Rate-limiting)
+  # Redis 7 (Rate-limiting, Celery Queue, and Caching)
   # ============================================================================
   redis:
     image: redis:7-alpine
@@ -36,52 +35,91 @@ services:
       - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
+      interval: 10s
       timeout: 3s
       retries: 5
     networks:
       - rag_network
 
-  # ============================================================================
-  # MinIO (S3-compatible Object Storage for Document Files)
-  # ============================================================================
-  minio:
-    image: minio/minio:latest
-    container_name: rag_minio
-    restart: unless-stopped
-    ports:
-      - "${MINIO_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
-    volumes:
-      - minio_data:/data
-    command: server /data --console-address ":9001"
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - rag_network
 
   # ============================================================================
-  # MinIO Bucket Auto-initializer
+  # FastAPI Backend (Retrieval, LLM Orchestration, APIs)
   # ============================================================================
-  minio-init:
-    image: minio/mc:latest
-    container_name: rag_minio_init
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rag_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - POSTGRES_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-rag_knowledge_db}
+      - REDIS_URL=redis://redis:6379/0
+
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ENVIRONMENT=development
+    volumes:
+      - ./backend/app:/app/app # Live reloading for dev
+      - ./backend/temp_uploads:/app/temp_uploads
     depends_on:
-      minio:
+      postgres:
         condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      /usr/bin/mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin};
-      /usr/bin/mc mb --ignore-existing myminio/${S3_BUCKET_NAME:-rag-documents};
-      /usr/bin/mc anonymous set download myminio/${S3_BUCKET_NAME:-rag-documents};
-      exit 0;
-      "
+      redis:
+        condition: service_healthy
+
+    networks:
+      - rag_network
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '1'
+          memory: 2G
+    # Use reload in dev
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  # ============================================================================
+  # Celery Worker (Async Background Processing)
+  # ============================================================================
+  celery_worker:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rag_celery
+    restart: unless-stopped
+    environment:
+      - POSTGRES_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-rag_knowledge_db}
+      - REDIS_URL=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ENVIRONMENT=development
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/temp_uploads:/app/temp_uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - rag_network
+    command: ["celery", "-A", "app.core.celery_app", "worker", "--loglevel=info"]
+
+  # ============================================================================
+  # React Frontend (Enterprise UI)
+  # ============================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: rag_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
     networks:
       - rag_network
 
@@ -92,8 +130,4 @@ networks:
 
 volumes:
   postgres_data:
-    name: rag_postgres_data
   redis_data:
-    name: rag_redis_data
-  minio_data:
-    name: rag_minio_data
