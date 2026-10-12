@@ -3,6 +3,7 @@ from uuid import uuid4
 import jwt
 import pytest
 from httpx import ASGITransport, AsyncClient
+from unittest.mock import patch
 
 from app.core.config import settings
 from app.core.security import ALGORITHM, get_password_hash
@@ -13,7 +14,10 @@ from app.models.db import UserModel
 
 @pytest.fixture
 async def app_with_db():
-    app = create_application()
+    # Force rate limiter to use memory backend for tests
+    with patch("app.core.config.settings.RATE_LIMIT_BACKEND", "memory"):
+        with patch("app.core.config.settings.RATE_LIMIT_FAIL_MODE", "open"):
+            app = create_application()
 
     # We will override the db session with a mock that returns a user
     class MockResult:
@@ -40,6 +44,12 @@ async def app_with_db():
         async def execute(self, stmt):
             # For login and me
             return MockResult(self.user)
+
+        def add(self, obj):
+            pass
+
+        async def commit(self):
+            pass
 
     # Create seeded user
     seeded_user = UserModel(
@@ -81,7 +91,7 @@ async def test_auth_verification(app_with_db):
         # [x] Decode JWT - verify claims include sub, email, role, and tenant_id
         token = data["access_token"]
         secret_key = settings.JWT_SECRET.get_secret_value()
-        payload = jwt.decode(token, secret_key, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, secret_key, algorithms=[ALGORITHM], audience=settings.JWT_AUDIENCE, issuer=settings.JWT_ISSUER)
 
         assert "sub" in payload
         assert "email" in payload

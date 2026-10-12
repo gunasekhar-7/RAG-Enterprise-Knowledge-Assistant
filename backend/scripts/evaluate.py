@@ -117,7 +117,7 @@ async def setup_environment():
 
     pipeline = DocumentIngestionPipeline()
     chunker = DocumentChunker()
-    embedder = EmbedderFactory.get_embedder()
+    embedder = await EmbedderFactory.get_embedder()
 
     all_chunks = []
 
@@ -147,7 +147,7 @@ async def setup_environment():
                 for i, c in enumerate(chunks):
                     c.chunk_id = f"{doc_prefix}_c{i:04d}"
 
-                embeddings = embedder.embed_batch([c.text for c in chunks])
+                embeddings = await embedder.embed_batch([c.text for c in chunks])
                 for c, emb in zip(chunks, embeddings, strict=False):
                     c.embedding = emb
                 await store.batch_insert(chunks)

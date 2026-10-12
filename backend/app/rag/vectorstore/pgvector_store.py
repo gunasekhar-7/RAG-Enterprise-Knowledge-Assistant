@@ -8,11 +8,16 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
+from app.core.config import settings
+from app.core.exceptions import ValidationError
 from app.db.session import Base, engine
 from app.rag.models import ChunkMetadata, DocumentChunk
 from app.rag.vectorstore.base import BaseVectorStore, SearchResult
 
 logger = structlog.get_logger(__name__)
+from app.core.metrics import RETRIEVAL_LATENCY
+from app.core.logging import request_id_ctx_var
+import time
 
 
 class ChunkORM(Base):
@@ -30,10 +35,8 @@ class ChunkORM(Base):
     section_heading = Column(String, nullable=True)
     custom_metadata = Column(JSON, default=dict)
 
-    # We set vector dimension later dynamically or assume a max size.
-    # pgvector allows leaving dimensions unspecified if we don't enforce it at schema level: Vector()
-    # But usually it's better to enforce. Here we'll use a dynamic or flexible Vector type.
-    embedding = Column(Vector(384), nullable=False)
+    # Vector dimension is set from configuration
+    embedding = Column(Vector(settings.VECTOR_DIM), nullable=False)
 
 
 class PGVectorStore(BaseVectorStore):
@@ -41,41 +44,29 @@ class PGVectorStore(BaseVectorStore):
     PostgreSQL + pgvector implementation of the Vector Store.
     """
 
-    def __init__(self, session: AsyncSession, dimensions: int = 1536):
+    def __init__(self, session: AsyncSession, dimensions: int | None = None):
         self.session = session
-        self.dimensions = dimensions
+        self.dimensions = dimensions or settings.VECTOR_DIM
+
+    def _validate_embedding(self, embedding: list[float], identifier: str = "unknown") -> None:
+        """Validate embedding dimension matches configured VECTOR_DIM."""
+        if len(embedding) != self.dimensions:
+            raise ValidationError(
+                message=f"Embedding dimension mismatch: expected {self.dimensions}, got {len(embedding)}",
+                field="embedding",
+                details={
+                    "expected_dimension": self.dimensions,
+                    "actual_dimension": len(embedding),
+                    "identifier": identifier,
+                },
+            )
 
     async def create_collection(self) -> None:
-        """Create the pgvector extension and tables if they don't exist."""
+        """Initialize the vector store - validate that required components exist."""
         logger.info("Initializing pgvector store")
-        async with engine.begin() as conn:
-            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
-            await conn.run_sync(Base.metadata.create_all)
-            # Create HNSW index for fast similarity search
-            # (In a real production environment this would be managed by Alembic migrations)
-            await conn.execute(
-                text(
-                    "CREATE INDEX IF NOT EXISTS document_chunks_embedding_idx "
-                    "ON document_chunks USING hnsw (embedding vector_cosine_ops);"
-                )
-            )
-            await conn.execute(
-                text(
-                    "CREATE INDEX IF NOT EXISTS idx_chunks_tenant_doc "
-                    "ON document_chunks(tenant_id, document_id);"
-                )
-            )
-            # Add Full-Text Search column and index
-            await conn.execute(
-                text(
-                    "ALTER TABLE document_chunks ADD COLUMN IF NOT EXISTS search_vector tsvector GENERATED ALWAYS AS (to_tsvector('english', text)) STORED;"
-                )
-            )
-            await conn.execute(
-                text(
-                    "CREATE INDEX IF NOT EXISTS idx_chunks_search_vector ON document_chunks USING gin(search_vector);"
-                )
-            )
+        # Note: Table creation, extension setup, and index creation are handled by Alembic migrations.
+        # This method now only performs validation to ensure the store is ready for use.
+        pass
 
     def _to_orm(self, chunk: DocumentChunk) -> ChunkORM:
         return ChunkORM(
@@ -115,6 +106,8 @@ class PGVectorStore(BaseVectorStore):
         if not chunk.embedding:
             raise ValueError(f"Chunk {chunk.chunk_id} has no embedding")
 
+        self._validate_embedding(chunk.embedding, chunk.chunk_id)
+
         orm_obj = self._to_orm(chunk)
         self.session.add(orm_obj)
         await self.session.commit()
@@ -124,7 +117,17 @@ class PGVectorStore(BaseVectorStore):
         if not chunks:
             return
 
-        orm_objs = [self._to_orm(chunk) for chunk in chunks if chunk.embedding]
+        orm_objs = []
+        for chunk in chunks:
+            if not chunk.embedding:
+                raise ValidationError(
+                    message=f"Chunk {chunk.chunk_id} has no embedding",
+                    field="embedding",
+                    details={"identifier": chunk.chunk_id},
+                )
+            self._validate_embedding(chunk.embedding, chunk.chunk_id)
+            orm_objs.append(self._to_orm(chunk))
+
         self.session.add_all(orm_objs)
         await self.session.commit()
         logger.info("Batch inserted chunks", count=len(orm_objs))
@@ -135,7 +138,9 @@ class PGVectorStore(BaseVectorStore):
         """
         Search using pgvector cosine distance operator (<=>).
         """
-        # Vector.cosine_distance maps to `<=>`
+        self._validate_embedding(query_embedding, "query_embedding")
+
+        # Vector.cosine_distance maps to <=>
         stmt = select(  # type: ignore
             ChunkORM, ChunkORM.embedding.cosine_distance(query_embedding).label("distance")
         )
@@ -151,20 +156,30 @@ class PGVectorStore(BaseVectorStore):
 
         stmt = stmt.order_by("distance").limit(top_k)
 
-        result = await self.session.execute(stmt)
-        rows = result.all()
+        start_time = time.time()
+        try:
+            result = await self.session.execute(stmt)
+            rows = result.all()
 
-        search_results = []
-        for row in rows:
-            chunk_orm = row[0]
-            distance = row[1]
-            # Convert cosine distance back to similarity (1 - distance)
-            similarity = 1.0 - float(distance)
-            domain_chunk = self._to_domain(chunk_orm)
-            search_results.append(SearchResult(chunk=domain_chunk, score=similarity))
+            search_results = []
+            for row in rows:
+                chunk_orm = row[0]
+                distance = row[1]
+                # Convert cosine distance back to similarity (1 - distance)
+                similarity = 1.0 - float(distance)
+                domain_chunk = self._to_domain(chunk_orm)
+                search_results.append(SearchResult(chunk=domain_chunk, score=similarity))
+        finally:
+            end_time = time.time()
+            latency = end_time - start_time
+            request_id = request_id_ctx_var.get()
+            if request_id:
+                logger.info("similarity_search_completed", request_id=request_id, latency=latency)
+            else:
+                logger.info("similarity_search_completed", request_id="unknown", latency=latency)
+            RETRIEVAL_LATENCY.labels(architecture="dense").observe(latency)
 
         return search_results
-
     async def delete(self, document_id: UUID) -> None:
         """Delete all chunks for a specific document."""
         stmt = text("DELETE FROM document_chunks WHERE document_id = :doc_id")

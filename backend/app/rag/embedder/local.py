@@ -1,3 +1,4 @@
+import asyncio
 import structlog
 from sentence_transformers import SentenceTransformer
 
@@ -24,16 +25,28 @@ class LocalEmbedder(BaseEmbedder):
         """
         self._model_name = model_name
         self._normalize_embeddings = normalize_embeddings
-        logger.info("Initializing LocalEmbedder", model=model_name)
+        self._model: SentenceTransformer | None = None
+        self._dimension: int | None = None
+        self._initialized = False
+        logger.info("LocalEmbedder created", model=model_name)
 
-        # This will automatically download the model if not present and use GPU if available
-        self._model = SentenceTransformer(self._model_name)
+    async def initialize(self) -> None:
+        """Initialize the SentenceTransformer model asynchronously."""
+        if self._initialized:
+            return
+        logger.info("Initializing LocalEmbedder model", model=self._model_name)
+        # Offload model loading to thread pool to avoid blocking the event loop
+        self._model = await asyncio.to_thread(SentenceTransformer, self._model_name)
 
-        # To determine dimension, we embed a dummy text
-        dummy_embedding = self._model.encode(
-            ["dummy"], normalize_embeddings=self._normalize_embeddings
-        )[0]
-        self._dimension = len(dummy_embedding)
+        # To determine dimension, we embed a dummy text (also in thread pool)
+        dummy_embedding = await asyncio.to_thread(
+            self._model.encode,
+            ["dummy"],
+            normalize_embeddings=self._normalize_embeddings,
+            show_progress_bar=False,
+        )
+        self._dimension = len(dummy_embedding[0])
+        self._initialized = True
         logger.info("LocalEmbedder initialized", dimension=self._dimension)
 
     @property
@@ -42,22 +55,36 @@ class LocalEmbedder(BaseEmbedder):
 
     @property
     def dimension(self) -> int:
+        if self._dimension is None:
+            raise RuntimeError("LocalEmbedder not initialized. Call initialize() first.")
         return self._dimension
 
-    def embed_text(self, text: str) -> list[float]:
-        """Embed a single string."""
-        embedding = self._model.encode(
-            [text], show_progress_bar=False, normalize_embeddings=self._normalize_embeddings
-        )[0]
-        # Convert numpy array to list of floats for pgvector compatibility
-        return embedding.tolist()  # type: ignore
+    async def embed_text(self, text: str) -> list[float]:
+        """Embed a single string asynchronously."""
+        if not self._initialized:
+            await self.initialize()
 
-    def embed_batch(self, texts: list[str]) -> list[list[float]]:
-        """Embed a batch of strings efficiently."""
+        embedding = await asyncio.to_thread(
+            self._model.encode,
+            [text],
+            show_progress_bar=False,
+            normalize_embeddings=self._normalize_embeddings,
+        )
+        # Convert numpy array to list of floats for pgvector compatibility
+        return embedding[0].tolist()  # type: ignore
+
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        """Embed a batch of strings efficiently asynchronously."""
+        if not self._initialized:
+            await self.initialize()
+
         if not texts:
             return []
 
-        embeddings = self._model.encode(
-            texts, show_progress_bar=False, normalize_embeddings=self._normalize_embeddings
+        embeddings = await asyncio.to_thread(
+            self._model.encode,
+            texts,
+            show_progress_bar=False,
+            normalize_embeddings=self._normalize_embeddings,
         )
         return embeddings.tolist()  # type: ignore

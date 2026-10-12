@@ -43,8 +43,14 @@ class TestChatPipelineQueryRewrite:
         conversation_id = uuid.UUID(conv_data["conversation_id"])
 
         # Send first message
-        with patch("app.rag.generator.query_rewriter.litellm.acompletion") as mock_llm:
-            mock_llm.return_value = MagicMock(
+        with patch(
+            "app.rag.generator.query_rewriter.litellm.acompletion"
+        ) as mock_rewriter, patch(
+            "app.rag.retrieval.hybrid.HybridRetriever.retrieve"
+        ) as mock_retrieve, patch(
+            "app.rag.generator.litellm_generator.LiteLLMGenerator.generate_structured"
+        ) as mock_generate:
+            mock_rewriter.return_value = MagicMock(
                 choices=[
                     MagicMock(
                         message=MagicMock(
@@ -53,6 +59,30 @@ class TestChatPipelineQueryRewrite:
                     )
                 ]
             )
+            mock_retrieve.return_value = RankedContext(
+                query="What is Python?",
+                results=[
+                    RetrievedContext(
+                        chunk_id="chunk_1",
+                        text="Python is a programming language.",
+                        score=0.95,
+                        citation="doc_1.pdf",
+                        metadata={"page": 1},
+                    ),
+                ],
+                total_found=1,
+            )
+            mock_generate.return_value = GenerationResult(
+                answer="Python is a programming language.",
+                citations=[
+                    Citation(
+                        chunk_id="chunk_1",
+                        source_name="doc_1.pdf",
+                        quote="Python is a programming language.",
+                    )
+                ],
+                insufficient_information=False,
+            )
             response = await admin_client.post(
                 f"/api/v1/chat/conversations/{conversation_id}/messages",
                 json={"message": "Tell me about Python"},
@@ -60,8 +90,14 @@ class TestChatPipelineQueryRewrite:
             assert response.status_code == 200
 
         # Send follow-up with pronoun
-        with patch("app.rag.generator.query_rewriter.litellm.acompletion") as mock_llm:
-            mock_llm.return_value = MagicMock(
+        with patch(
+            "app.rag.generator.query_rewriter.litellm.acompletion"
+        ) as mock_rewriter, patch(
+            "app.rag.retrieval.hybrid.HybridRetriever.retrieve"
+        ) as mock_retrieve, patch(
+            "app.rag.generator.litellm_generator.LiteLLMGenerator.generate_structured"
+        ) as mock_generate:
+            mock_rewriter.return_value = MagicMock(
                 choices=[
                     MagicMock(
                         message=MagicMock(
@@ -71,6 +107,30 @@ class TestChatPipelineQueryRewrite:
                         )
                     )
                 ]
+            )
+            mock_retrieve.return_value = RankedContext(
+                query="What are the use cases of Python?",
+                results=[
+                    RetrievedContext(
+                        chunk_id="chunk_1",
+                        text="Python is used for web development, data science, and scripting.",
+                        score=0.95,
+                        citation="doc_1.pdf",
+                        metadata={"page": 1},
+                    ),
+                ],
+                total_found=1,
+            )
+            mock_generate.return_value = GenerationResult(
+                answer="Python is used for web development, data science, and scripting.",
+                citations=[
+                    Citation(
+                        chunk_id="chunk_1",
+                        source_name="doc_1.pdf",
+                        quote="Python is used for web development, data science, and scripting.",
+                    )
+                ],
+                insufficient_information=False,
             )
             response = await admin_client.post(
                 f"/api/v1/chat/conversations/{conversation_id}/messages",
@@ -97,8 +157,14 @@ class TestChatPipelineQueryRewrite:
         conversation_id = uuid.UUID(conv_data["conversation_id"])
 
         # Send first message without history
-        with patch("app.rag.generator.query_rewriter.litellm.acompletion") as mock_llm:
-            mock_llm.return_value = MagicMock(
+        with patch(
+            "app.rag.generator.query_rewriter.litellm.acompletion"
+        ) as mock_rewriter, patch(
+            "app.rag.retrieval.hybrid.HybridRetriever.retrieve"
+        ) as mock_retrieve, patch(
+            "app.rag.generator.litellm_generator.LiteLLMGenerator.generate_structured"
+        ) as mock_generate:
+            mock_rewriter.return_value = MagicMock(
                 choices=[
                     MagicMock(
                         message=MagicMock(
@@ -108,6 +174,30 @@ class TestChatPipelineQueryRewrite:
                         )
                     )
                 ]
+            )
+            mock_retrieve.return_value = RankedContext(
+                query="What is machine learning?",
+                results=[
+                    RetrievedContext(
+                        chunk_id="chunk_1",
+                        text="Machine learning is a subset of artificial intelligence.",
+                        score=0.95,
+                        citation="doc_1.pdf",
+                        metadata={"page": 1},
+                    ),
+                ],
+                total_found=1,
+            )
+            mock_generate.return_value = GenerationResult(
+                answer="Machine learning is a subset of AI.",
+                citations=[
+                    Citation(
+                        chunk_id="chunk_1",
+                        source_name="doc_1.pdf",
+                        quote="Machine learning is a subset of artificial intelligence.",
+                    )
+                ],
+                insufficient_information=False,
             )
             response = await admin_client.post(
                 f"/api/v1/chat/conversations/{conversation_id}/messages",
@@ -132,8 +222,14 @@ class TestChatPipelineQueryRewrite:
         conversation_id = uuid.UUID(conv_data["conversation_id"])
 
         # Add initial message to create history
-        with patch("app.rag.generator.query_rewriter.litellm.acompletion") as mock_llm:
-            mock_llm.return_value = MagicMock(
+        with patch(
+            "app.rag.generator.query_rewriter.litellm.acompletion"
+        ) as mock_rewriter, patch(
+            "app.rag.retrieval.hybrid.HybridRetriever.retrieve"
+        ) as mock_retrieve, patch(
+            "app.rag.generator.litellm_generator.LiteLLMGenerator.generate_structured"
+        ) as mock_generate:
+            mock_rewriter.return_value = MagicMock(
                 choices=[
                     MagicMock(
                         message=MagicMock(
@@ -142,6 +238,30 @@ class TestChatPipelineQueryRewrite:
                     )
                 ]
             )
+            mock_retrieve.return_value = RankedContext(
+                query="What is AI?",
+                results=[
+                    RetrievedContext(
+                        chunk_id="chunk_1",
+                        text="AI is artificial intelligence.",
+                        score=0.95,
+                        citation="doc_1.pdf",
+                        metadata={"page": 1},
+                    ),
+                ],
+                total_found=1,
+            )
+            mock_generate.return_value = GenerationResult(
+                answer="AI is artificial intelligence.",
+                citations=[
+                    Citation(
+                        chunk_id="chunk_1",
+                        source_name="doc_1.pdf",
+                        quote="AI is artificial intelligence.",
+                    )
+                ],
+                insufficient_information=False,
+            )
             response = await admin_client.post(
                 f"/api/v1/chat/conversations/{conversation_id}/messages",
                 json={"message": "What is AI?"},
@@ -149,8 +269,38 @@ class TestChatPipelineQueryRewrite:
             assert response.status_code == 200
 
         # Send follow-up with LLM failure
-        with patch("app.rag.generator.query_rewriter.litellm.acompletion") as mock_llm:
-            mock_llm.side_effect = Exception("LLM service unavailable")
+        with patch(
+            "app.rag.generator.query_rewriter.litellm.acompletion"
+        ) as mock_rewriter, patch(
+            "app.rag.retrieval.hybrid.HybridRetriever.retrieve"
+        ) as mock_retrieve, patch(
+            "app.rag.generator.litellm_generator.LiteLLMGenerator.generate_structured"
+        ) as mock_generate:
+            mock_rewriter.side_effect = Exception("LLM service unavailable")
+            mock_retrieve.return_value = RankedContext(
+                query="Tell me more about it",
+                results=[
+                    RetrievedContext(
+                        chunk_id="chunk_1",
+                        text="AI is artificial intelligence.",
+                        score=0.95,
+                        citation="doc_1.pdf",
+                        metadata={"page": 1},
+                    ),
+                ],
+                total_found=1,
+            )
+            mock_generate.return_value = GenerationResult(
+                answer="AI is artificial intelligence.",
+                citations=[
+                    Citation(
+                        chunk_id="chunk_1",
+                        source_name="doc_1.pdf",
+                        quote="AI is artificial intelligence.",
+                    )
+                ],
+                insufficient_information=False,
+            )
             response = await admin_client.post(
                 f"/api/v1/chat/conversations/{conversation_id}/messages",
                 json={"message": "Tell me more about it"},

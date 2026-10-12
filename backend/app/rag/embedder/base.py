@@ -20,7 +20,7 @@ class BaseEmbedder(ABC):
         pass
 
     @abstractmethod
-    def embed_text(self, text: str) -> list[float]:
+    async def embed_text(self, text: str) -> list[float]:
         """
         Embed a single text string.
 
@@ -33,7 +33,7 @@ class BaseEmbedder(ABC):
         pass
 
     @abstractmethod
-    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """
         Embed a batch of text strings.
 
@@ -43,4 +43,8 @@ class BaseEmbedder(ABC):
         Returns:
             List[List[float]]: A list of vector representations corresponding to the input texts.
         """
+        pass
+
+    async def initialize(self) -> None:
+        """Optional initialization for models that need async setup."""
         pass

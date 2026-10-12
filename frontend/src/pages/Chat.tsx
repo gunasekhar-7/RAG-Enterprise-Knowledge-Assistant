@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Loader2, BookOpen, AlertCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { apiClient } from '../api/client';
+import { apiClient, waitForAuth } from '../api/client';
 
 interface Citation {
   chunk_id: string;
@@ -17,26 +17,79 @@ interface Message {
   insufficient_information?: boolean;
 }
 
+interface ConversationResponse {
+  conversation_id: string;
+  created_at: string;
+}
+
 export const Chat: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  
+  // Refs to prevent duplicate initialization
+  const initPromiseRef = useRef<Promise<string | null> | null>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const initConversation = async () => {
-    try {
-      const res = await apiClient.post('/chat/conversations');
-      setConversationId(res.data.conversation_id);
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  const initConversation = useCallback(async (): Promise<string | null> => {
+    // If already initialized, return existing conversation ID
+    if (conversationId) return conversationId;
+    
+    // If initialization is in progress, return the existing promise
+    if (initPromiseRef.current) return initPromiseRef.current;
+
+    // Create new initialization promise
+    const promise = (async () => {
+      try {
+        setIsInitializing(true);
+        setError(null);
+        
+        // Wait for auth to be ready
+        await waitForAuth();
+        
+        const res = await apiClient.post<ConversationResponse>('/conversations');
+        
+        if (!isMountedRef.current) return null;
+        
+        const newConversationId = res.data.conversation_id;
+        setConversationId(newConversationId);
+        return newConversationId;
+      } catch (err) {
+        if (!isMountedRef.current) return null;
+        console.error('Failed to initialize conversation:', err);
+        setError('Failed to start conversation. Please refresh the page.');
+        return null;
+      } finally {
+        if (isMountedRef.current) {
+          setIsInitializing(false);
+          initPromiseRef.current = null;
+        }
+      }
+    })();
+
+    initPromiseRef.current = promise;
+    return promise;
+  }, [conversationId]);
+
+  // Initialize conversation on mount
+  useEffect(() => {
+    initConversation();
+  }, [initConversation]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,9 +102,15 @@ export const Chat: React.FC = () => {
     setError(null);
 
     try {
-      if (!conversationId) await initConversation();
+      // Ensure conversation is initialized before sending message
+      const currentConversationId = conversationId || await initConversation();
       
-      const res = await apiClient.post(`/chat/conversations/${conversationId || 'new'}/messages`, {
+      if (!currentConversationId) {
+        throw new Error('Conversation not available');
+      }
+
+      // Use the correct backend endpoint: /conversations/{conversation_id}/messages
+      const res = await apiClient.post(`/conversations/${currentConversationId}/messages`, {
         message: userMsg.content
       });
 
@@ -71,6 +130,26 @@ export const Chat: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  // Show loading during initial auth + conversation initialization
+  if (isInitializing) {
+    return (
+      <div className="flex flex-col h-full bg-white">
+        <div className="px-8 py-4 border-b border-gray-200 flex justify-between items-center bg-white shadow-sm z-10">
+          <div>
+            <h2 className="text-xl font-bold text-gray-800">Enterprise Assistant</h2>
+            <p className="text-sm text-gray-500">Ask questions securely against your internal knowledge base.</p>
+          </div>
+        </div>
+        <div className="flex-1 flex items-center justify-center bg-gray-50/50">
+          <div className="text-center">
+            <Loader2 className="w-10 h-10 text-blue-600 animate-spin mx-auto mb-4" />
+            <p className="text-gray-500">Initializing secure chat session...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -155,13 +234,13 @@ export const Chat: React.FC = () => {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            disabled={isLoading}
+            disabled={isLoading || isInitializing}
             placeholder="Ask about company policies, technical specs, or documents..."
             className="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-xl focus:ring-blue-500 focus:border-blue-500 block p-4 pr-12 shadow-sm disabled:opacity-50"
           />
           <button
             type="submit"
-            disabled={isLoading || !input.trim()}
+            disabled={isLoading || isInitializing || !input.trim()}
             className="absolute right-2 p-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Send className="w-5 h-5" />

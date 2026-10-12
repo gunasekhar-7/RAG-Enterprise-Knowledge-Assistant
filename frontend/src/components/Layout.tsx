@@ -5,15 +5,25 @@ import { MessageSquare, LayoutDashboard, FileText, Search, Settings, LogOut } fr
 import clsx from 'clsx';
 
 export const Layout: React.FC = () => {
-  const { isAuthenticated, logout, user } = useAuthStore();
+  const { isAuthenticated, isLoading, user } = useAuthStore();
   const navigate = useNavigate();
 
-  if (!isAuthenticated()) {
+  // Show loading while auth is being initialized
+  if (isLoading) {
+    return (
+      <div className="flex h-screen bg-gray-50 text-gray-900 items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
+      </div>
+    );
+  }
+
+  // Redirect to login if not authenticated
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
   const handleLogout = () => {
-    logout();
+    useAuthStore.getState().logout();
     navigate('/login');
   };
 

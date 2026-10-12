@@ -6,6 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.core.exceptions import RetrievalError
+from app.core.metrics import RETRIEVAL_LATENCY
+from app.core.logging import request_id_ctx_var
+import time
+
 from app.rag.models import DocumentChunk
 from app.rag.retrieval.base import BaseKeywordStore, BaseRetriever, RankedContext, RetrievedContext
 from app.rag.vectorstore.base import SearchResult
@@ -50,10 +54,20 @@ class PostgresFTSStore(BaseKeywordStore):
 
         stmt = stmt.order_by(text("rank DESC")).limit(top_k)
 
+        start_time = time.time()
         try:
             result = await self.session.execute(stmt, params)
         except Exception as e:
             raise RetrievalError(message="Keyword search failed", retriever_type="sparse", details={"error": str(e)})
+        finally:
+            end_time = time.time()
+            latency = end_time - start_time
+            request_id = request_id_ctx_var.get()
+            if request_id:
+                logger.info("sparse_search_completed", request_id=request_id, latency=latency)
+            else:
+                logger.info("sparse_search_completed", request_id="unknown", latency=latency)
+            RETRIEVAL_LATENCY.labels(architecture="sparse").observe(latency)
 
         rows = result.all()
 
@@ -87,9 +101,10 @@ class PostgresFTSStore(BaseKeywordStore):
         if search_results:
             max_s = search_results[0].score
             min_s = search_results[-1].score
-            denom = max_s - min_s if max_s > min_s else 1.0
-            for r in search_results:
-                r.score = (r.score - min_s) / denom
+            if max_s > min_s:
+                denom = max_s - min_s
+                for r in search_results:
+                    r.score = (r.score - min_s) / denom
 
         return search_results
 

@@ -1,9 +1,13 @@
 import logging
 import sys
+import contextvars
 
 import structlog
 
 from app.core.config import settings
+
+# Context variable for request ID
+request_id_ctx_var: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="unknown")
 
 
 def setup_logging() -> None:

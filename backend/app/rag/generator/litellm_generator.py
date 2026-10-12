@@ -3,6 +3,7 @@ import json
 import litellm
 import structlog
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from typing import AsyncIterator
 
 from app.core.config import settings
 from app.core.exceptions import LLMError, LLMRateLimitError, LLMTimeoutError
@@ -88,6 +89,52 @@ class LiteLLMGenerator(BaseLLM):
         except json.JSONDecodeError as e:
             logger.error("LLM returned invalid JSON", error=str(e))
             raise LLMError(message="LLM returned invalid response format", model=self.model_name, retryable=False, details={"error": str(e)}) from e
+        except Exception as e:
+            logger.error("LLM Generation failed", error=str(e))
+            raise LLMError(message="LLM generation failed", model=self.model_name, retryable=False, details={"error": str(e)}) from e
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type(
+            (litellm.exceptions.RateLimitError, litellm.exceptions.ServiceUnavailableError)
+        ),
+        reraise=True,
+    )
+    async def generate_text_stream(
+        self, system_prompt: str, messages: list[dict]
+    ) -> AsyncIterator[str]:
+        """
+        Streams the LLM response as text deltas.
+        """
+        full_messages = [{"role": "system", "content": system_prompt}] + messages
+
+        try:
+            response = await litellm.acompletion(
+                model=self.model_name,
+                messages=full_messages,
+                temperature=self.temperature,
+                max_tokens=1500,
+                stream=True,
+                api_key=settings.OPENAI_API_KEY.get_secret_value(),
+            )
+
+            async for chunk in response:
+                if chunk.choices[0].delta.get('content'):
+                    yield chunk.choices[0].delta.content
+
+        except litellm.exceptions.RateLimitError as e:
+            logger.error("LLM rate limit exceeded", error=str(e))
+            raise LLMRateLimitError(model=self.model_name) from e
+        except litellm.exceptions.ServiceUnavailableError as e:
+            logger.error("LLM service unavailable", error=str(e))
+            raise LLMError(message="LLM service unavailable", model=self.model_name, retryable=True, details={"error": str(e)}) from e
+        except litellm.exceptions.TimeoutError as e:
+            logger.error("LLM request timed out", error=str(e))
+            raise LLMTimeoutError(model=self.model_name, timeout_seconds=1500) from e
+        except litellm.exceptions.AuthenticationError as e:
+            logger.error("LLM authentication failed", error=str(e))
+            raise LLMError(message="LLM authentication failed", model=self.model_name, retryable=False, details={"error": str(e)}) from e
         except Exception as e:
             logger.error("LLM Generation failed", error=str(e))
             raise LLMError(message="LLM generation failed", model=self.model_name, retryable=False, details={"error": str(e)}) from e

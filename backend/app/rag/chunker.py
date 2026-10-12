@@ -182,17 +182,21 @@ class DocumentChunker:
         char_to_page = []  # type: ignore
 
         for page in document.pages:
-            page_text = page.text.strip()
-            if not page_text:
-                continue
+             page_text = page.text.strip()
+             if not page_text:
+                 continue
 
-            if global_text:
-                sep = "\n\n"
-                global_text += sep
-                char_to_page.extend([char_to_page[-1]] * len(sep))
+             if global_text:
+                 sep = "\n\n"
+                 global_text += sep
+                 if char_to_page:
+                     char_to_page.extend([char_to_page[-1]] * len(sep))
+                 else:
+                     # Fallback: use page 1 (should not happen in normal flow)
+                     char_to_page.extend([1] * len(sep))
 
-            global_text += page_text
-            char_to_page.extend([page.page_number] * len(page_text))
+             global_text += page_text
+             char_to_page.extend([page.page_number] * len(page_text))
 
         if not global_text:
             return chunks
@@ -228,17 +232,37 @@ class DocumentChunker:
             if len(clean_chunk_text) < self.config.min_chunk_size_chars:
                 continue
 
-            start_char_idx = raw_positions[i][0]
-            if i > 0 and self.config.chunk_overlap > 0:
-                prefix = clean_chunk_text[:20]
-                idx = global_text.find(prefix, raw_positions[i - 1][0])
-                if idx != -1 and idx <= raw_positions[i][0]:
-                    start_char_idx = idx
+            # Compute start and end indices in global_text for the overlapped chunk
+            if i == 0:
+                start_char_idx = raw_positions[0][0]
+                end_char_idx = raw_positions[0][1] - 1
+            else:
+                # Compute the cleaned overlap string from the previous raw chunk
+                prev_raw_chunk = raw_chunks[i-1]
+                prev_tokens = self.tokenizer.encode(prev_raw_chunk)
+                overlap_tokens = prev_tokens[-self.config.chunk_overlap :] if self.config.chunk_overlap > 0 else []
+                overlap_str = self.tokenizer.decode(overlap_tokens)
+                # Clean the overlap string (same as in _apply_overlap)
+                overlap_words = overlap_str.split()
+                if len(overlap_words) > 1:
+                    clean_overlap = " ".join(overlap_words[1:])
                 else:
-                    start_char_idx = raw_positions[i - 1][0]
+                    clean_overlap = overlap_str
 
-            end_char_idx = raw_positions[i][1] - 1
-            if end_char_idx < 0:
+                # The start of the overlapped chunk in global_text is: raw_positions[i-1][1] - len(clean_overlap)
+                start_char_idx = raw_positions[i-1][1] - len(clean_overlap)
+                # The end of the overlapped chunk is: raw_positions[i][1] - 1 (because we are not adding anything at the end)
+                end_char_idx = raw_positions[i][1] - 1
+
+            # Clamp the indices to valid range [0, len(global_text)-1]
+            if global_text:
+                start_char_idx = max(0, min(start_char_idx, len(global_text)-1))
+                end_char_idx = max(0, min(end_char_idx, len(global_text)-1))
+                # Ensure start_char_idx <= end_char_idx
+                if start_char_idx > end_char_idx:
+                    start_char_idx = end_char_idx
+            else:
+                start_char_idx = 0
                 end_char_idx = 0
 
             page_start = char_to_page[start_char_idx] if start_char_idx < len(char_to_page) else 1

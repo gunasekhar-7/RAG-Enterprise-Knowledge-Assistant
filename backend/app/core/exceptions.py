@@ -75,6 +75,9 @@ class ErrorCode(str, Enum):
     CONFIG_INVALID = "CONFIG_INVALID"
     CONFIG_MISSING_SECRET = "CONFIG_MISSING_SECRET"
 
+    # Rate Limiting
+    RATE_LIMIT_EXCEEDED = "RATE_LIMIT_EXCEEDED"
+
     # Internal/Unexpected
     INTERNAL_ERROR = "INTERNAL_ERROR"
     NOT_IMPLEMENTED = "NOT_IMPLEMENTED"
@@ -398,13 +401,14 @@ class RAGError(AppError):
         error_code: ErrorCode = ErrorCode.RAG_RETRIEVAL_FAILED,
         status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
         details: Optional[dict[str, Any]] = None,
+        log_level: str = "error",
     ) -> None:
         super().__init__(
             message=message,
             error_code=error_code,
             status_code=status_code,
             details=details,
-            log_level="error",
+            log_level=log_level,
         )
 
 

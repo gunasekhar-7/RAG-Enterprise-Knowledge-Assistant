@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
@@ -20,10 +20,10 @@ class MockEmbedder(BaseEmbedder):
     def dimension(self) -> int:
         return 3
 
-    def embed_text(self, text: str) -> list[float]:
+    async def embed_text(self, text: str) -> list[float]:
         return [0.1, 0.2, 0.3]
 
-    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         return [[0.1, 0.2, 0.3] for _ in texts]
 
 
@@ -62,15 +62,16 @@ def dummy_chunks() -> list[DocumentChunk]:
     ]
 
 
-def test_embedding_pipeline_process_chunks(dummy_chunks):
+@pytest.mark.asyncio
+async def test_embedding_pipeline_process_chunks(dummy_chunks):
     """Test that pipeline successfully embeds chunks and uses cache."""
     with patch(
-        "app.rag.embedder.factory.EmbedderFactory.get_embedder", return_value=MockEmbedder()
+        "app.rag.embedder.factory.EmbedderFactory.get_embedder", new_callable=AsyncMock, return_value=MockEmbedder()
     ):
         pipeline = EmbeddingPipeline(batch_size=2)
 
         # Process first time (cache miss)
-        processed = pipeline.process_chunks(dummy_chunks)
+        processed = await pipeline.process_chunks(dummy_chunks)
 
         assert len(processed) == 2
         assert processed[0].embedding == [0.1, 0.2, 0.3]
@@ -86,33 +87,37 @@ def test_embedding_pipeline_process_chunks(dummy_chunks):
         with patch.object(
             pipeline._embedder, "embed_batch", side_effect=Exception("Should not be called!")
         ):
-            processed_again = pipeline.process_chunks(dummy_chunks)
+            processed_again = await pipeline.process_chunks(dummy_chunks)
             assert processed_again[0].embedding == [0.1, 0.2, 0.3]
 
 
-def test_factory_returns_correct_embedder():
+@pytest.mark.asyncio
+async def test_factory_returns_correct_embedder():
     with patch("app.core.config.settings.EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5"):  # noqa: SIM117
         with patch("app.rag.embedder.local.SentenceTransformer"):
             # Mock SentenceTransformer so it doesn't download weights during unit tests
-            embedder = EmbedderFactory.get_embedder()
+            EmbedderFactory.reset()
+            embedder = await EmbedderFactory.get_embedder()
             assert isinstance(embedder, LocalEmbedder)
             assert embedder.model_name == "BAAI/bge-small-en-v1.5"
 
     with patch("app.core.config.settings.EMBEDDING_MODEL", "text-embedding-3-small"):  # noqa: SIM117
-        embedder = EmbedderFactory.get_embedder()
+        EmbedderFactory.reset()
+        embedder = await EmbedderFactory.get_embedder()
         assert isinstance(embedder, OpenAIEmbedder)
         assert embedder.model_name == "text-embedding-3-small"
         assert embedder.dimension == 1536
 
 
-def test_openai_embedder_embed_text():
+@pytest.mark.asyncio
+async def test_openai_embedder_embed_text():
     embedder = OpenAIEmbedder(model_name="text-embedding-3-small", dimensions=1536)
 
     mock_response = MagicMock()
     mock_response.data = [{"embedding": [0.5, 0.5]}]
 
     with patch("litellm.embedding", return_value=mock_response) as mock_embedding:
-        res = embedder.embed_text("hello world")
+        res = await embedder.embed_text("hello world")
         assert res == [0.5, 0.5]
         mock_embedding.assert_called_once()
         kwargs = mock_embedding.call_args.kwargs

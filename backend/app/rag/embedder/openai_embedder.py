@@ -1,3 +1,4 @@
+import asyncio
 import litellm
 import structlog
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
@@ -20,7 +21,7 @@ class OpenAIEmbedder(BaseEmbedder):
         Initialize the OpenAI embedder.
 
         Args:
-            model_name (str): Model identifier (e.g., text-embedding-3-small).
+            model_name (str): Model identifier (e.g. text-embedding-3-small).
             dimensions (int): Vector dimension size.
         """
         self._model_name = model_name
@@ -41,8 +42,8 @@ class OpenAIEmbedder(BaseEmbedder):
         retry=retry_if_exception_type(litellm.exceptions.RateLimitError),
         reraise=True,
     )
-    def embed_text(self, text: str) -> list[float]:
-        """Embed a single string with retries."""
+    def _embed_text_sync(self, text: str) -> list[float]:
+        """Synchronous embedding for single text (for use in thread pool)."""
         try:
             response = litellm.embedding(
                 model=self._model_name,
@@ -61,8 +62,8 @@ class OpenAIEmbedder(BaseEmbedder):
         retry=retry_if_exception_type(litellm.exceptions.RateLimitError),
         reraise=True,
     )
-    def embed_batch(self, texts: list[str]) -> list[list[float]]:
-        """Embed a batch of strings with retries."""
+    def _embed_batch_sync(self, texts: list[str]) -> list[list[float]]:
+        """Synchronous embedding for batch (for use in thread pool)."""
         if not texts:
             return []
 
@@ -81,3 +82,11 @@ class OpenAIEmbedder(BaseEmbedder):
                 "Failed to embed batch", error=str(e), model=self._model_name, batch_size=len(texts)
             )
             raise
+
+    async def embed_text(self, text: str) -> list[float]:
+        """Embed a single string asynchronously."""
+        return await asyncio.to_thread(self._embed_text_sync, text)
+
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        """Embed a batch of strings asynchronously."""
+        return await asyncio.to_thread(self._embed_batch_sync, texts)

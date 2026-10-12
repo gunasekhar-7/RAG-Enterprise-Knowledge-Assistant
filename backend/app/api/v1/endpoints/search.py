@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.auth import get_current_user, get_tenant_filters
+from app.api.dependencies.rate_limit_checker import check_search_limit
 from app.core.exceptions import (
     EmptyQueryError,
     RetrievalError,
@@ -38,6 +39,7 @@ async def direct_search(  # type: ignore
     current_user: UserResponse = Depends(get_current_user),
     tenant_filters: dict = Depends(get_tenant_filters),
     db: AsyncSession = Depends(get_db_session),
+    _: None = Depends(check_search_limit),
 ):
     """
     Perform a direct hybrid semantic search without LLM answer generation.
@@ -48,7 +50,7 @@ async def direct_search(  # type: ignore
         raise EmptyQueryError()
 
     try:
-        embedder = EmbedderFactory.get_embedder()
+        embedder = await EmbedderFactory.get_embedder()
     except Exception as e:
         raise EmbeddingError(message="Failed to initialize embedder", details={"error": str(e)})
 

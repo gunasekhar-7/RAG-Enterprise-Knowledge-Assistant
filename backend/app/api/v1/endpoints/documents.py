@@ -1,6 +1,7 @@
 import os
 import uuid
 from datetime import datetime
+from pathlib import Path
 
 import aiofiles
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
@@ -9,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.api.dependencies.auth import RequireRole, get_current_user
+from app.api.dependencies.rate_limit_checker import check_document_upload_limit
 from app.core.exceptions import (
     EmptyDocumentError,
     DocumentTooLargeError,
@@ -21,7 +23,7 @@ from app.db.session import get_db_session
 from app.models.db import DocumentModel
 from app.models.user import Role, UserResponse
 from app.rag.vectorstore.pgvector_store import PGVectorStore
-from app.tasks.document_tasks import process_document_task
+from app.tasks.document_tasks import _get_temp_upload_dir, _safe_upload_path, process_document_task
 
 router = APIRouter()
 
@@ -39,6 +41,7 @@ async def upload_document(  # type: ignore
     file: UploadFile = File(...),
     current_user: UserResponse = Depends(RequireRole(Role.MANAGER)),  # Only managers+ can upload
     db: AsyncSession = Depends(get_db_session),
+    _: None = Depends(check_document_upload_limit),
 ):
     """
     Upload a document for processing.
@@ -66,10 +69,8 @@ async def upload_document(  # type: ignore
 
     try:
         # Create a temp file to pass to celery worker
-        # Note: In production, upload to S3 first and pass the S3 URI instead.
-        temp_dir = os.path.join(os.getcwd(), "temp_uploads")
-        os.makedirs(temp_dir, exist_ok=True)
-        file_path = os.path.join(temp_dir, f"{uuid.uuid4()}_{sanitized_filename}")
+        # Use dedicated temp directory with safe unique path
+        file_path = _safe_upload_path(sanitized_filename)
 
         async with aiofiles.open(file_path, 'wb') as out_file:
             await out_file.write(content)

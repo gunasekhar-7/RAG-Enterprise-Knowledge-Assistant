@@ -15,7 +15,7 @@
     "expected_answer": "All full-time employees are eligible for the 401k match after 90 days of employment.",
     "expected_source": "HR_Policy_2026.md",
     "relevant_chunk_ids": [
-      "doc_hr_policy_2026_c0000"
+      "doc_hr_policy_2026_c0001"
     ],
     "negative_query": false
   },
@@ -25,7 +25,7 @@
     "expected_answer": "Employees are entitled to 12 weeks of paid maternity leave after one year of continuous service.",
     "expected_source": "HR_Policy_2026.md",
     "relevant_chunk_ids": [
-      "doc_hr_policy_2026_c0000"
+      "doc_hr_policy_2026_c0002"
     ],
     "negative_query": false
   },
@@ -35,7 +35,7 @@
     "expected_answer": "Yes, employees are granted 2 dedicated mental health days per year separate from standard sick leave.",
     "expected_source": "HR_Policy_2026.md",
     "relevant_chunk_ids": [
-      "doc_hr_policy_2026_c0000"
+      "doc_hr_policy_2026_c0003"
     ],
     "negative_query": false
   },
@@ -45,7 +45,7 @@
     "expected_answer": "The company supports a hybrid model allowing employees to work from home up to 3 days per week.",
     "expected_source": "HR_Policy_2026.md",
     "relevant_chunk_ids": [
-      "doc_hr_policy_2026_c0000"
+      "doc_hr_policy_2026_c0004"
     ],
     "negative_query": false
   },
@@ -55,7 +55,7 @@
     "expected_answer": "Passwords must be rotated every 90 days and must not reuse the last 5 passwords.",
     "expected_source": "IT_Security_SOP.md",
     "relevant_chunk_ids": [
-      "doc_it_security_sop_c0000"
+      "doc_it_security_sop_c0005"
     ],
     "negative_query": false
   },
@@ -65,7 +65,7 @@
     "expected_answer": "Report a lost YubiKey immediately to the IT Helpdesk via phone to revoke access.",
     "expected_source": "IT_Security_SOP.md",
     "relevant_chunk_ids": [
-      "doc_it_security_sop_c0000"
+      "doc_it_security_sop_c0006"
     ],
     "negative_query": false
   },
@@ -75,7 +75,7 @@
     "expected_answer": "Only explicitly whitelisted browser extensions may be installed. Requests must go through IT Security.",
     "expected_source": "IT_Security_SOP.md",
     "relevant_chunk_ids": [
-      "doc_it_security_sop_c0000"
+      "doc_it_security_sop_c0007"
     ],
     "negative_query": false
   },
@@ -85,7 +85,7 @@
     "expected_answer": "No, the use of personal USB drives or external storage is strictly prohibited on company endpoints.",
     "expected_source": "IT_Security_SOP.md",
     "relevant_chunk_ids": [
-      "doc_it_security_sop_c0000"
+      "doc_it_security_sop_c0008"
     ],
     "negative_query": false
   },
@@ -95,7 +95,7 @@
     "expected_answer": "The corporate VPN will automatically disconnect after 12 hours of continuous connection.",
     "expected_source": "IT_Security_SOP.md",
     "relevant_chunk_ids": [
-      "doc_it_security_sop_c0000"
+      "doc_it_security_sop_c0009"
     ],
     "negative_query": false
   },
@@ -105,7 +105,7 @@
     "expected_answer": "The daily per diem for meals and incidental expenses in London is $125 USD.",
     "expected_source": "Travel_Policy.md",
     "relevant_chunk_ids": [
-      "doc_travel_policy_c0000"
+      "doc_travel_policy_c0010"
     ],
     "negative_query": false
   },
@@ -115,7 +115,7 @@
     "expected_answer": "First-class flights are only permitted for international travel exceeding 8 hours of continuous flight time.",
     "expected_source": "Travel_Policy.md",
     "relevant_chunk_ids": [
-      "doc_travel_policy_c0000"
+      "doc_travel_policy_c0011"
     ],
     "negative_query": false
   },
@@ -125,7 +125,7 @@
     "expected_answer": "All travel expenses must be submitted via Concur within 14 days of trip completion.",
     "expected_source": "Travel_Policy.md",
     "relevant_chunk_ids": [
-      "doc_travel_policy_c0000"
+      "doc_travel_policy_c0012"
     ],
     "negative_query": false
   },
@@ -135,7 +135,7 @@
     "expected_answer": "Alcohol is only reimbursable during official client dinners, capped at 2 drinks per person.",
     "expected_source": "Travel_Policy.md",
     "relevant_chunk_ids": [
-      "doc_travel_policy_c0000"
+      "doc_travel_policy_c0013"
     ],
     "negative_query": false
   },
@@ -145,7 +145,7 @@
     "expected_answer": "The company reimburses the cost of TSA PreCheck or Global Entry for frequent travelers (3+ trips/year).",
     "expected_source": "Travel_Policy.md",
     "relevant_chunk_ids": [
-      "doc_travel_policy_c0000"
+      "doc_travel_policy_c0014"
     ],
     "negative_query": false
   },
@@ -155,7 +155,7 @@
     "expected_answer": "All primary production workloads must be deployed in the us-east-1 AWS region.",
     "expected_source": "Infra_SOP.md",
     "relevant_chunk_ids": [
-      "doc_infra_sop_c0000"
+      "doc_infra_sop_c0015"
     ],
     "negative_query": false
   },
@@ -165,7 +165,7 @@
     "expected_answer": "Automated database backups are retained for 35 days in S3 Glacier.",
     "expected_source": "Infra_SOP.md",
     "relevant_chunk_ids": [
-      "doc_infra_sop_c0000"
+      "doc_infra_sop_c0016"
     ],
     "negative_query": false
   },
@@ -175,7 +175,7 @@
     "expected_answer": "P1 (Critical) incidents have a strict 15-minute response SLA and a 2-hour resolution target.",
     "expected_source": "Infra_SOP.md",
     "relevant_chunk_ids": [
-      "doc_infra_sop_c0000"
+      "doc_infra_sop_c0017"
     ],
     "negative_query": false
   },
@@ -185,7 +185,7 @@
     "expected_answer": "Emergency deployments require explicit approval from the VP of Engineering or the on-call Director.",
     "expected_source": "Infra_SOP.md",
     "relevant_chunk_ids": [
-      "doc_infra_sop_c0000"
+      "doc_infra_sop_c0018"
     ],
     "negative_query": false
   },
@@ -195,7 +195,7 @@
     "expected_answer": "Terraform is the exclusive tool for provisioning AWS infrastructure resources.",
     "expected_source": "Infra_SOP.md",
     "relevant_chunk_ids": [
-      "doc_infra_sop_c0000"
+      "doc_infra_sop_c0019"
     ],
     "negative_query": false
   },

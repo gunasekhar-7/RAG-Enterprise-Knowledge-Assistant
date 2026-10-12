@@ -6,7 +6,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.core.logging import logger, setup_logging
+from app.core.logging import logger, setup_logging, request_id_ctx_var
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 from app.core.exceptions import register_exception_handlers
 
 
@@ -17,7 +18,9 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     from app.rag.retrieval.reranker import FlashRankReranker
 
     logger.info("Loading FlashRankReranker...")
-    _app.state.reranker = FlashRankReranker()
+    reranker = FlashRankReranker()
+    await reranker.initialize()
+    _app.state.reranker = reranker
     logger.info(
         "application_starting",
         app_name=settings.APP_NAME,
@@ -53,6 +56,7 @@ def create_application() -> FastAPI:
     async def add_request_id(request, call_next):
         request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())[:8]
         request.state.request_id = request_id
+        request_id_ctx_var.set(request_id)
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
         return response
@@ -83,3 +87,7 @@ def create_application() -> FastAPI:
 
 
 app = create_application()
+
+@app.get("/metrics")
+async def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)

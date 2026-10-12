@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
@@ -19,7 +19,26 @@ class UserModel(Base):
     role = Column(SQLEnum(Role), default=Role.EMPLOYEE, nullable=False)  # type: ignore
     tenant_id = Column(PG_UUID(as_uuid=True), index=True, nullable=False)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class RefreshTokenModel(Base):
+    __tablename__ = "refresh_tokens"
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    jti = Column(String, unique=True, nullable=False, index=True)  # JWT ID for revocation
+    expires_at = Column(DateTime, nullable=False)
+    revoked_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    # Track token family for rotation detection
+    family_id = Column(String, nullable=True, index=True)
+    # Store hash of the token for verification without storing plaintext
+    token_hash = Column(String, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "jti", name="uq_refresh_token_user_jti"),
+    )
 
 
 class ConversationModel(Base):
@@ -29,8 +48,8 @@ class ConversationModel(Base):
     tenant_id = Column(PG_UUID(as_uuid=True), index=True, nullable=False)
     user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     title = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
 class MessageModel(Base):
@@ -42,7 +61,7 @@ class MessageModel(Base):
     )
     role = Column(String, nullable=False)  # user, assistant, system
     content = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class DocumentModel(Base):
@@ -57,4 +76,4 @@ class DocumentModel(Base):
     status = Column(String, nullable=False)  # processing, completed, failed
     token_count = Column(Integer, default=0)
     storage_key = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

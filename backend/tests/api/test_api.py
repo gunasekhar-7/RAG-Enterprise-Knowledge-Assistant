@@ -32,7 +32,9 @@ async def test_send_message_guardrail_trigger(employee_client):
     )
 
     assert response.status_code == 400
-    assert "blocked by security guardrails" in response.json()["detail"]
+    data = response.json()
+    assert data["error"] == "SECURITY_VIOLATION"
+    assert "blocked by security guardrails" in data["message"]
 
 
 @pytest.mark.asyncio

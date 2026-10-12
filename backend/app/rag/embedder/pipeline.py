@@ -16,19 +16,22 @@ class EmbeddingPipeline:
     """
 
     def __init__(self, batch_size: int = 100):
-        self._embedder = EmbedderFactory.get_embedder()
         self._batch_size = batch_size
         # Simple in-memory cache mapping md5(text) -> embedding
         self._cache: dict[str, list[float]] = {}
-        logger.info(
-            "Initialized EmbeddingPipeline", model=self._embedder.model_name, batch_size=batch_size
-        )
+        self._embedder = None
+        self._initialized = False
+
+    async def _get_embedder(self):
+        if self._embedder is None:
+            self._embedder = await EmbedderFactory.get_embedder()
+        return self._embedder
 
     def _get_hash(self, text: str) -> str:
         """Return MD5 hash of the text for cache keying."""
         return hashlib.md5(text.encode("utf-8")).hexdigest()
 
-    def process_chunks(self, chunks: list[DocumentChunk]) -> list[DocumentChunk]:
+    async def process_chunks(self, chunks: list[DocumentChunk]) -> list[DocumentChunk]:
         """
         Embeds a list of DocumentChunks in batches.
         Mutates the chunks in-place to add .embedding and .metadata.embedding_model,
@@ -37,7 +40,9 @@ class EmbeddingPipeline:
         if not chunks:
             return chunks
 
-        model_name = self._embedder.model_name
+        embedder = await self._get_embedder()
+        model_name = embedder.model_name
+        logger.info("Initialized EmbeddingPipeline", model=model_name, batch_size=self._batch_size)
 
         for i in range(0, len(chunks), self._batch_size):
             batch = chunks[i : i + self._batch_size]
@@ -55,7 +60,7 @@ class EmbeddingPipeline:
             # Embed the cache misses
             if texts_to_embed:
                 logger.debug(f"Embedding batch of {len(texts_to_embed)} chunks (cache misses)...")
-                embeddings = self._embedder.embed_batch(texts_to_embed)
+                embeddings = await embedder.embed_batch(texts_to_embed)
 
                 # Update cache
                 for text, emb in zip(texts_to_embed, embeddings, strict=False):

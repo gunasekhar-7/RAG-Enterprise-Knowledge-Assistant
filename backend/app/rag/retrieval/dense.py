@@ -33,7 +33,7 @@ class VectorRetriever(BaseRetriever):
             return RankedContext(query=query, results=[], total_found=0)
 
         try:
-            query_embedding = self.embedder.embed_text(query)
+            query_embedding = await self.embedder.embed_text(query)
         except Exception as e:
             raise EmbeddingError(message="Failed to generate query embedding", details={"error": str(e)})
 

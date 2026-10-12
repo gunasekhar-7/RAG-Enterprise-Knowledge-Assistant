@@ -49,7 +49,7 @@ class GenerationPipeline:
         system_prompt = self.prompt_builder.build_system_prompt(formatted_context)
 
         # 3. Assemble messages
-        messages = conversation_history or []
+        messages = list(conversation_history) if conversation_history is not None else []
         messages.append({"role": "user", "content": query})
 
         # 4. Generate structured response

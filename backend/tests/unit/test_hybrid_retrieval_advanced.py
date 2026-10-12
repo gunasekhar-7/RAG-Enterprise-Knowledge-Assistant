@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.core.exceptions import RerankerError, RetrievalError
 from app.rag.models import ChunkMetadata, DocumentChunk
 from app.rag.retrieval.base import BaseReranker, RankedContext, RetrievedContext
 from app.rag.retrieval.hybrid import HybridRetriever
@@ -833,7 +834,7 @@ async def test_hybrid_retrieval_dense_retriever_exception(
         total_found=0,
     )
 
-    with pytest.raises(RuntimeError, match="Dense retriever failed"):
+    with pytest.raises(RetrievalError, match="Parallel retrieval failed"):
         await hybrid_retriever.retrieve("test query")
 
 
@@ -858,7 +859,7 @@ async def test_hybrid_retrieval_sparse_retriever_exception(
     )
     mock_sparse_retriever.retrieve.side_effect = RuntimeError("Sparse retriever failed")
 
-    with pytest.raises(RuntimeError, match="Sparse retriever failed"):
+    with pytest.raises(RetrievalError, match="Parallel retrieval failed"):
         await hybrid_retriever.retrieve("test query")
 
 
@@ -891,7 +892,7 @@ async def test_hybrid_retrieval_reranker_exception(
     )
     mock_reranker.rerank.side_effect = RuntimeError("Reranker failed")
 
-    with pytest.raises(RuntimeError, match="Reranker failed"):
+    with pytest.raises(RerankerError, match="Reranking failed"):
         await hybrid_retriever_with_reranker.retrieve("test query")
 
 

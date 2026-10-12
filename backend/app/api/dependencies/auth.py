@@ -14,7 +14,7 @@ from app.core.exceptions import (
     MissingClaimsError,
     UserNotFoundError,
 )
-from app.core.security import ALGORITHM
+from app.core.security import ALGORITHM, decode_token
 from app.models.user import Role, UserResponse
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
@@ -35,14 +35,13 @@ async def get_current_user(
         raise MissingTokenError()
 
     try:
-        payload = jwt.decode(token, secret_key, algorithms=[ALGORITHM])
-    except jwt.PyJWTError as e:
-        if isinstance(e, jwt.ExpiredSignatureError):
-            raise ExpiredTokenError() from e
-        elif isinstance(e, jwt.InvalidSignatureError):
-            raise InvalidSignatureError() from e
-        else:
-            raise InvalidTokenError() from e
+        payload = decode_token(token, secret_key=secret_key, algorithm=ALGORITHM, expected_type="access")
+    except jwt.ExpiredSignatureError:
+        raise ExpiredTokenError()
+    except jwt.InvalidSignatureError:
+        raise InvalidSignatureError()
+    except jwt.InvalidTokenError:
+        raise InvalidTokenError()
     except ValidationError as e:
         raise InvalidTokenError() from e
 
@@ -62,7 +61,7 @@ async def get_current_user(
         raise UserNotFoundError(user_id)
 
     if not db_user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
 
     return UserResponse(
         id=db_user.id,  # type: ignore

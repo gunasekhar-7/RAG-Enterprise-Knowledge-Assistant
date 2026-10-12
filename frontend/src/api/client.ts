@@ -9,7 +9,7 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().token;
+  const token = useAuthStore.getState().getToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -25,3 +25,19 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Helper to wait for auth initialization
+export const waitForAuth = async (): Promise<void> => {
+  const { isLoading } = useAuthStore.getState();
+  if (!isLoading) return;
+  
+  // Wait for auth state to be loaded from persistence
+  return new Promise((resolve) => {
+    const unsubscribe = useAuthStore.subscribe((state) => {
+      if (!state.isLoading) {
+        unsubscribe();
+        resolve();
+      }
+    });
+  });
+};
